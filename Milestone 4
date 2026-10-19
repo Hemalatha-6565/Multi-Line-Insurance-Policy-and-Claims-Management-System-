@@ -1,0 +1,100 @@
+Milestone 4: Advanced Claim Processing, Security & Code Setup
+
+1.Modify the Claim object to include an Approval Status field.
+
+2.Configure the Approval Process to route first to the Senior Adjuster, then to the Department Manager, using two sequential steps.
+2.1 Create Approval 
+
+3.Create a Record-Triggered Flow (After Save) that checks if the Claim Amount is $>\$50,000$ and submits the record to an Approval Process.
+
+4. Implement a Screen Flow for the approvers to quickly review details and approve/reject directly from the Claim record.
+4.1 Create a Quick Action
+
+5.Write an extensive Apex Test Class for the ClaimsAdjusterController with 95%+ code coverage. Include test methods for complex claim filtering and data retrieval logic.
+@isTest
+private class ClaimsAdjusterControllerTest {
+    @testSetup
+    static void setupTestData() {
+        // Create a real active test user
+        Profile p = [SELECT Id FROM Profile WHERE Name = 'Standard User' LIMIT 1];
+        User u = new User(
+            FirstName = 'Test',
+            LastName = 'User',
+            Alias = 'tuser',
+            Username = 'testuser1234343@example.com.test',
+            Email = 'testuser123@example.com',
+            TimeZoneSidKey = 'America/Los_Angeles',
+            LocaleSidKey = 'en_US',
+            EmailEncodingKey = 'UTF-8',
+            LanguageLocaleKey = 'en_US',
+            ProfileId = p.Id
+        );
+        insert u;
+
+        // Query Policy__c RecordType
+        Id policyRT = Schema.SObjectType.Policy__c.getRecordTypeInfosByDeveloperName()
+            .get('Auto')
+            .getRecordTypeId();
+        Id claimRT = Schema.SObjectType.Claim__c.getRecordTypeInfosByDeveloperName()
+            .get('Accident') 
+            .getRecordTypeId();
+
+        // Create Contact owned by same user
+        Contact con = new Contact(
+            FirstName = 'John',
+            LastName = 'Doe',
+            OwnerId = u.Id
+        );
+        insert con;
+
+        // Create Policy owned by same user
+        Policy__c policy = new Policy__c(
+            Customer__c = con.Id,
+            RecordTypeId = policyRT,
+            OwnerId = u.Id,
+            VIN__c = '1A903284375893532'
+        );
+        insert policy;
+
+        // Create Claim owned by same user
+        Claim__c claim = new Claim__c(
+            Policy__c = policy.Id,
+            RecordTypeId = claimRT,
+            Claim_Amount__c = 5000,
+            Date_of_Loss__c = Date.today().addDays(-10),
+            OwnerId = u.Id
+        );
+        insert claim;
+        System.debug('Claim inserted: '+claim.Id);
+    }
+    @isTest
+    static void testGetAssignedClaims() {
+        User u = [SELECT Id FROM User WHERE Alias = 'tuser' LIMIT 1];
+        System.runAs(u) {
+            Test.startTest();
+            List<ClaimsAdjusterController.ClaimWrapper> results =
+                ClaimsAdjusterController.getAssignedClaims();
+            System.debug('Result is: '+results);
+            Test.stopTest();
+            //System.assert(results.size() > 0,
+                //'Expected at least one wrapper returned');
+
+            ClaimsAdjusterController.ClaimWrapper wrap = results[0];
+
+            System.assertNotEquals(null, wrap.claimId);
+            System.assertNotEquals(null, wrap.claimNumber);
+            System.assertEquals('New', wrap.status);
+            System.assertEquals(5000, wrap.claimAmount);
+            System.assert(wrap.policyHolderName.contains('John'));
+            System.assertNotEquals('Unknown', wrap.policyType);
+        }
+    }
+}
+
+6.Refine the Sharing Rules to ensure Adjusters only see claims in their assigned territory/state.
+6.1 Define Sharing Rules for Claim Object
+
+7.Finalize all Permission Sets to differentiate access between Agents (Quoting only), Adjusters (Claim handling), and Managers (Reporting/Approvals).
+7.1 Create Claims Manager Access Permission set
+7.2 Create Claims Adjuster Access Permission Set
+
