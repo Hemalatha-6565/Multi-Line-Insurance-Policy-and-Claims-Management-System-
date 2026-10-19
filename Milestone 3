@@ -1,0 +1,241 @@
+Milestone 3: Claims Adjuster LWC Dashboard Development
+
+1.Create a robust Apex class (ClaimsAdjusterController) with a method using SOQL to query all Claims owned by the logged-in user, joining related Policy and Customer data. The method must return a custom Wrapper Class listing key metrics.
+code:
+public class ClaimsAdjusterController {
+
+    public class ClaimWrapper {
+        @AuraEnabled public Id claimId;
+        @AuraEnabled public String claimNumber;
+        @AuraEnabled public Decimal claimAmount;
+        @AuraEnabled public String status;
+        @AuraEnabled public String policyType;
+        @AuraEnabled public String policyHolderName;
+        @AuraEnabled public Integer daysOpen; 
+
+        public ClaimWrapper(Claim__c c, Policy__c p, Contact customerRec) {
+            this.claimId = c.Id;
+            this.claimNumber = c.Name;
+            this.claimAmount = c.Claim_Amount__c;
+            this.status = c.Approval_Status__c; 
+            
+            Policy__c policyRecord = (Policy__c)p;
+
+            if (policyRecord != null && policyRecord.RecordType != null) {
+                this.policyType = policyRecord.RecordType.Name; 
+            } else {
+                this.policyType = 'Unknown';
+            }
+
+            this.policyHolderName = (customerRec != null) ? customerRec.Name : ''; 
+            
+            this.daysOpen = (c.Date_of_Loss__c != null) 
+                              ? (Date.today().daysBetween(c.Date_of_Loss__c.date())) 
+                              : 0;
+        }
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<ClaimWrapper> getAssignedClaims() {
+        
+        List<ClaimWrapper> results = new List<ClaimWrapper>();
+        
+        List<Claim__c> claims = [
+        SELECT 
+            Id, Name, Claim_Amount__c, Approval_Status__c, Date_of_Loss__c,
+            Policy__r.Name, 
+            Policy__r.RecordType.DeveloperName, 
+            Policy__r.Customer__r.FirstName, 
+            Policy__r.Customer__r.LastName 
+        FROM Claim__c
+        WHERE OwnerId = :UserInfo.getUserId()
+        ORDER BY Date_of_Loss__c DESC
+    ];
+
+        for (Claim__c claim : claims) {
+            
+            Policy__c policy = claim.Policy__r;
+            
+            Contact customer = (policy != null && policy.Customer__r != null) 
+                              ? (Contact)policy.Customer__r 
+                              : new Contact(); 
+            
+            results.add(new ClaimWrapper(claim, policy, customer)); 
+        }
+
+        return results;
+    }
+}
+
+2.Create a component (claimsDashboardLwc) that uses the Apex method via the @wire service and implements client-side data filtering
+<template>
+    <lightning-card title="My Assigned Claims Dashboard" icon-name="standard:claim">
+        <div class="slds-m-around_medium">
+            <lightning-combobox
+                name="policyFilter"
+                label="Filter by Policy Type"
+                value="All"
+                options={policyTypeOptions}
+                onchange={handleFilterChange}
+                class="slds-m-bottom_medium"
+            ></lightning-combobox>
+
+
+            <template if:true={visibleClaims}>
+                <div class="slds-grid slds-wrap slds-grid_pull-padded">
+                    <template for:each={visibleClaims} for:item="claim">
+                        <div key={claim.claimId} class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-large-size_1-of-3 slds-p-horizontal_small">
+                            <c-claim-tile-lwc claim-data={claim}></c-claim-tile-lwc>
+                        </div>
+                    </template>
+                </div>
+                <p class="slds-m-top_medium slds-text-heading_small">Total Claims Assigned: {visibleClaims.length}</p>
+            </template>
+            <template if:false={visibleClaims}>
+                <p>No claims currently assigned to you.</p>
+            </template>
+        </div>
+    </lightning-card>
+</template>
+
+
+ JS file code:
+import { LightningElement, wire, track } from 'lwc';
+// Import the Apex method
+import getAssignedClaims from '@salesforce/apex/ClaimsAdjusterController.getAssignedClaims';
+
+
+export default class ClaimsDashboardLwc extends LightningElement {
+    // List to hold all data retrieved from Apex
+    @track allClaims = [];
+    // List to display after filtering
+    @track visibleClaims = [];
+    error;
+   
+    // Wire service to call the Apex method
+    @wire(getAssignedClaims)
+    wiredClaims({ error, data }) {
+        if (data) {
+            this.allClaims = data;
+            this.visibleClaims = data; // Initially display all claims
+            this.error = undefined;
+        } else if (error) {
+            this.error = error;
+            this.allClaims = undefined;
+            this.visibleClaims = undefined;
+            console.error('Error retrieving claims:', JSON.stringify(error));
+        }
+    }
+
+
+    // Client-side filtering logic (Required by M3)
+    handleFilterChange(event) {
+        const selectedPolicyType = event.target.value;
+       
+        if (selectedPolicyType === 'All') {
+            this.visibleClaims = this.allClaims;
+        } else {
+            // Filter claims where policyType matches the selected value
+            this.visibleClaims = this.allClaims.filter(claim =>
+                claim.policyType === selectedPolicyType
+            );
+        }
+    }
+
+
+    get policyTypeOptions() {
+        // Options for the filter dropdown
+        return [
+            { label: 'All Policy Types', value: 'All' },
+            { label: 'Auto', value: 'Auto' },
+            { label: 'Property', value: 'Property' },
+            { label: 'Life', value: 'Life' }
+        ];
+    }
+}
+
+ meta-xml file code:
+<?xml version="1.0"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <isExposed>true</isExposed>
+    <targets>
+        <target>lightning__AppPage</target>
+        <target>lightning__HomePage</target>
+    </targets>
+</LightningComponentBundle>
+
+Create a reusable component (claimTileLwc) to display essential information for each claim
+Open the Lightning studio extension from your salesforce org
+On the Top left corner, you will find Create New
+Click on Create New and Click on Lightning Web Component
+Enter the name of the Component as claimTileLwc
+Check the isExposed checkbox	
+Under target configurations, Select Lightning app page, Home page and Record page
+Click on Deploy
+Open the HTML file and paste the following code:
+<template>
+    <lightning-layout-item size="12" padding="around-small">
+        <div class="tile slds-box slds-p-around_medium slds-theme_default">
+            <header class="slds-media slds-media_center slds-m-bottom_small">
+                <div class="slds-media__figure">
+                    <lightning-icon icon-name={policyIcon} alternative-text={claimData.policyType} size="small"></lightning-icon>
+                </div>
+                <div class="slds-media__body slds-m-left_small">
+                    <h2 class="slds-text-heading_medium slds-m-bottom_none">
+                        Claim: {claimData.claimNumber}
+                    </h2>
+                    <p class="slds-text-body_small">Policy Type: <strong>{claimData.policyType}</strong></p>
+                </div>
+            </header>
+
+
+            <div class="slds-border_top slds-p-top_small">
+                <p>Policy Holder: <strong>{claimData.policyHolderName}</strong></p>
+               
+                <lightning-formatted-number
+                    value={claimData.claimAmount}
+                    format-style="currency"
+                    currency-code="USD"
+                    label="Claim Amount">
+                </lightning-formatted-number>
+               
+                <p>Status: {claimData.status}</p>
+
+
+                <p class="slds-text-body_regular">
+                    Days Open: <strong class="slds-text-color_error">{claimData.daysOpen}</strong>
+                </p>
+            </div>
+        </div>
+    </lightning-layout-item>
+</template>
+
+ JS File code:
+import { LightningElement, api } from 'lwc';
+
+
+export default class ClaimTileLwc extends LightningElement {
+    // @api decorator exposes this property to the parent component
+    @api claimData;
+
+
+    // Helper property to determine the correct icon based on Policy Type
+    get policyIcon() {
+        if (this.claimData && this.claimData.policyType) {
+            const type = this.claimData.policyType.toLowerCase();
+            if (type === 'auto') return 'utility:truck';
+            if (type === 'property') return 'utility:home';
+            if (type === 'life') return 'utility:connected_apps';
+        }
+        return 'utility:help';
+    }
+}
+
+ meta-xml file code
+<?xml version="1.0"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>63.0</apiVersion>
+    <isExposed>true</isExposed>
+</LightningComponentBundle>
+
