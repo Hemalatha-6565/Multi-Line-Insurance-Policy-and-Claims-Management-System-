@@ -1,0 +1,137 @@
+1.Core Data Model & Policy Configuration
+User Story1: Creation of custom objects
+*Go to setup, Click on object Manager.
+Click on create and select custom object.
+Fill the following details:
+Label: Policy
+Plural Label: Policies
+Object Name: Auto Populated
+Record Name: Policy Number
+Data type: Auto Number
+Format: P - {0000}
+Starting Number: 1
+Under optional features:
+Allow Reports, Activities and Track field History
+Under Deployment Status:
+Select the deployed radio button.
+Under Search Status:
+Check the Allow Search checkbox.
+Click on save.
+
+2.Define Record Types on Policy Object:
+*Go to setup, Click on Object Manager.
+○ Search for Policy objects and click on Policy__c.
+○ In the left side panel, click on the record types.
+○ Click on New.
+○ Fill out the following details:
+○ Select the existing record type as Master.
+○ Give record type label as “Auto”
+○ Record Type Name will be auto populated.
+○ Give a meaningful description.
+○ Check the active checkbox.
+○ Check the Make Available checkbox for all the profiles.
+○ Click on Next.
+● It will redirect to the Assign page layouts page, Leave everything as is, and click on save
+
+3.Create Field Sets for policy specific data:
+
+*Go to setup, Click on Object Manager.
+Search for Policy object and click on Policy__c.
+In the left side panel, click on the Field Sets.
+Click on New.
+Fill out the following details:
+Field Set Label as Vehicle
+Field Set Name will be Auto populated.
+Where is this used: In the policy object.
+Click on save.
+Click on the field set you have just created and it will redirect to the page layout setup.
+Drag VIN, and model year fields to the field set and click on save.
+
+4.Create Fields in the Policy Object
+
+5.Create Claim custom object:
+
+Go to setup, Click on object Manager.
+Click on create and select custom object.
+Fill the following details:
+Label: Claim
+Plural Label: Claim
+Object Name: Auto Populated
+Record Name: Claim Number
+Data type: Auto Number
+Format: C - {0000}
+Starting Number: 1
+Under optional features:
+Allow Reports, Activities and Track field History
+Under Deployment Status:
+Select the deployed radio button.
+Under Search Status:
+Check the Allow Search checkbox.
+Click on save.
+
+6.Define Record Types on Claim Object:
+
+*Go to setup, Click on Object Manager.
+Search for Claim object and click on Claim__c.
+In the left side panel, click on the record types.
+Click on New.
+Fill out the following details:
+Select the existing record type as Master.
+Give record type label as “Accident”
+Record Type Name will be auto populated.
+Give a meaningful description.
+Check the active checkbox.
+Check the Make Available checkbox for all the profiles.
+Click on Next.
+It will redirect to the Assign page layouts page, Leave everything as is, and click on save.
+
+7.Create Fields in the Claim Object:
+
+8.Create an AutoQuoting Screen Flow
+
+*Go to setup, Search for flows in the quick find box.
+Click on flows and click on new flow.
+Select Screen Flow and Click on Create.
+Add Get Records Element immediately after the start element.
+Give Label as Get Vehicle RT ID 
+Api Name will be auto populated
+Select Record Type for Object
+For Conditional Requirements, Select All Conditions are met
+The Conditions include:
+sObject Type Name  Equals Policy__c
+And 
+Record Type Name Equals Auto
+Create an AutoQuoting Screen Flow
+Go to setup, Search for flows in the quick find box.
+Click on flows and click on new flow.
+Select Screen Flow and Click on Create.
+Add Get Records Element immediately after the start element.
+Give Label as Get Vehicle RT ID 
+Api Name will be auto populated
+Select Record Type for Object
+For Conditional Requirements, Select All Conditions are met
+The Conditions include:
+sObject Type Name  Equals Policy__c
+And 
+Record Type Name Equals Auto
+
+9.Create Validation Rule on Policy Object:
+Go to object manager, Search for the policy object and click on policy object
+In the left side panel, scroll down and find validation rules and click on it
+Click on New
+
+Give the rule name as VIN_Must_Be_17_Characters
+Check the active checkbox
+Write the following formula in the formula editor
+AND( RecordType.DeveloperName = "Auto", LEN( VIN__c )<> 17)
+For error message, The Vehicle Identification Number (VIN) must be exactly 17 characters long for Auto Policies.
+Select error location as field and select VIN field
+Click on Save
+
+
+
+
+
+
+
+
